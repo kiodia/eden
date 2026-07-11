@@ -172,13 +172,30 @@ Just like `events`, Eden detects Linux and switches to `PROD` mode automatically
 uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
+## Angels
+
+An **Angel** (`angel.py`) is the guardian agent God places in the Garden to serve one user persona. Its behaviour is an agentskills.io skill exactly as Hermes-Agent implements it: a directory with a required `SKILL.md` (YAML frontmatter + instructions) plus optional `scripts/`, `references/` and `assets/` directories.
+
+```python
+from angel import Angel
+
+angel = Angel.from_skill_dir("assets/guardian-angel")
+angel.name          # "guardian-angel" (from the frontmatter)
+angel.persona       # "researcher" - the persona it guards
+angel.instructions  # the SKILL.md body Hermes-Agent executes
+angel.to_card_fields()  # serialize the Angel into Kanban card fields (kind="angel")
+```
+
+The first simple Agent lives in `assets/guardian-angel/SKILL.md`: it watches the board via notify(), claims task cards for its persona, works them on Hermes-Agent, writes result cards, and leaves nothing behind.
+
 ## Testing
 
 ```bash
-python tests/test_api.py
+python tests/test_api.py     # 32 checks: security, write/read/take, board, leases, txns, notify
+python tests/test_angel.py   # 30 checks: full Angel lifecycle against a real uvicorn server
 ```
 
-Covers security (API key), write/read/take (both modes), board view, leases (renew/cancel/expiry), transactions (commit, abort, isolation), and notify subscriptions — 32 checks.
+`test_angel.py` loads the guardian Angel from `assets/`, creates Kanban entries, exercises **every** FastAPI entry point (verified automatically against `app.routes`, including the live SSE stream), and checks that nothing is left behind: no cards, no transactions, no subscriptions.
 
 ## Error Responses
 
