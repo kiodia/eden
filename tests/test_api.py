@@ -2,11 +2,15 @@
 Test suite for the Eden API (JavaSpaces operations on Kanban cards).
 Uses the FastAPI TestClient, so no server needs to be running.
 
-    python test_api.py
+    python tests/test_api.py
 """
 from fastapi.testclient import TestClient
 import os
+import sys
 import time
+
+# Make the project root importable when running from the tests folder
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("MODE", "TESTING")
 

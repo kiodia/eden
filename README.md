@@ -175,7 +175,7 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 ## Testing
 
 ```bash
-python test_api.py
+python tests/test_api.py
 ```
 
 Covers security (API key), write/read/take (both modes), board view, leases (renew/cancel/expiry), transactions (commit, abort, isolation), and notify subscriptions — 32 checks.
