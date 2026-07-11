@@ -210,11 +210,52 @@ angel2 = Angel.from_bundle(wire)    # unpack - fully verified first
 
 Validation is strict at parse time: the schema identifier must be `skill-bundle/v1`, the entrypoint must be among the files, paths must be unique and safe (no absolute paths or `..` traversal), and every file's SHA-256 must match its content — a corrupted or tampered bundle is rejected before an Angel is ever built from it. `Angel.to_card_fields()` embeds the bundle in the Kanban card, and `Angel.from_card_fields()` verifies it on the way back.
 
+## Angels — the Host (multi-agent system)
+
+`angels.py` builds many Angels into one coordinated system, separating a skill's **identity** from its **serialization**:
+
+```
+Skill (identity)                        SkillBundle (serialization)
+ ├── metadata                            skill-bundle/v1 JSON envelope
+ ├── entrypoint (SKILL.md)               with SHA-256 per file,
+ ├── resources                           produced by Skill.to_bundle()
+ ├── helper scripts                      and verified again by
+ └── dependencies                        Skill.from_bundle()
+      ├── Kanban card assignments
+      └── workflow assignments
+```
+
+A `SkillDependency` declares what a skill needs from the board — `kind` + `action` (`consume` = take matching cards, `produce` = write them), template `fields`, and its place in a named `workflow`/`step`. Members hold no references to each other (Linda principle); the board wires them together.
+
+```python
+from angels import Angels, Skill, SkillDependency
+
+guardian = Skill.from_angel(Angel.from_skill_dir("assets/guardian-angel"), dependencies=[
+    SkillDependency(kind="task",   action="consume", workflow="newsroom", step=1),
+    SkillDependency(kind="result", action="produce", workflow="newsroom", step=1),
+])
+scribe = Skill(metadata=..., entrypoint=..., dependencies=[
+    SkillDependency(kind="result", action="consume", workflow="newsroom", step=2),
+    SkillDependency(kind="digest", action="produce", workflow="newsroom", step=2),
+])
+
+host = Angels(name="newsroom-host")
+host.enlist(guardian)
+host.enlist(scribe)
+host.validate_system()      # [] = wiring is sound (steps consecutive, every consumed kind produced, ...)
+host.workflow("newsroom")   # ordered (step, angel, dependency) exchanges
+for payload in host.deployment_cards():   # POST /api/write/ bodies: kind='angel' cards
+    requests.post(f"{base}/api/write/", json=payload, headers=headers)
+```
+
+`validate_system()` reports broken wiring: non-consecutive workflow steps, a step consuming a kind no earlier step produces, or produced cards nobody consumes (except a workflow's final deliverable, which the user picks up).
+
 ## Testing
 
 ```bash
 python tests/test_api.py     # 32 checks: security, write/read/take, board, leases, txns, notify
 python tests/test_angel.py   # 42 checks: full Angel lifecycle against a real uvicorn server
+python tests/test_angels.py  # 41 checks: two-Angel newsroom workflow (task -> result -> digest)
 ```
 
 `test_angel.py` loads the guardian Angel from `assets/`, creates Kanban entries, exercises **every** FastAPI entry point (verified automatically against `app.routes`, including the live SSE stream), and checks that nothing is left behind: no cards, no transactions, no subscriptions.
