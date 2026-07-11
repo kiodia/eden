@@ -2,6 +2,8 @@
 name: guardian-angel
 description: A first simple guardian Angel that watches the Eden board and claims task cards for its persona
 persona: researcher
+version: 1.0.0
+tags: eden, kanban, guardian
 ---
 
 # Guardian Angel

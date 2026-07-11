@@ -188,11 +188,33 @@ angel.to_card_fields()  # serialize the Angel into Kanban card fields (kind="ang
 
 The first simple Agent lives in `assets/guardian-angel/SKILL.md`: it watches the board via notify(), claims task cards for its persona, works them on Hermes-Agent, writes result cards, and leaves nothing behind.
 
+### Skill bundles (integrity-checked transport)
+
+For robust transport between agents (over the Eden space, HTTP, or disk) a skill is packed into a **`skill-bundle/v1`** envelope — a self-describing JSON document with metadata, an explicit entrypoint, and a SHA-256 checksum per file:
+
+```json
+{
+  "schema": "skill-bundle/v1",
+  "metadata": {"name": "guardian-angel", "version": "1.0.0",
+               "description": "...", "tags": ["eden", "kanban"]},
+  "entrypoint": "SKILL.md",
+  "files": [{"path": "SKILL.md", "sha256": "...", "content": "..."}]
+}
+```
+
+```python
+bundle = angel.to_bundle()          # pack, checksums computed
+wire = bundle.dump_json()           # ship it
+angel2 = Angel.from_bundle(wire)    # unpack - fully verified first
+```
+
+Validation is strict at parse time: the schema identifier must be `skill-bundle/v1`, the entrypoint must be among the files, paths must be unique and safe (no absolute paths or `..` traversal), and every file's SHA-256 must match its content — a corrupted or tampered bundle is rejected before an Angel is ever built from it. `Angel.to_card_fields()` embeds the bundle in the Kanban card, and `Angel.from_card_fields()` verifies it on the way back.
+
 ## Testing
 
 ```bash
 python tests/test_api.py     # 32 checks: security, write/read/take, board, leases, txns, notify
-python tests/test_angel.py   # 30 checks: full Angel lifecycle against a real uvicorn server
+python tests/test_angel.py   # 42 checks: full Angel lifecycle against a real uvicorn server
 ```
 
 `test_angel.py` loads the guardian Angel from `assets/`, creates Kanban entries, exercises **every** FastAPI entry point (verified automatically against `app.routes`, including the live SSE stream), and checks that nothing is left behind: no cards, no transactions, no subscriptions.

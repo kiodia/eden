@@ -74,6 +74,40 @@ def run_tests():
         check("skill carries full SKILL.md", angel.skill.skill_md.startswith("---"), angel.skill.skill_md[:20])
         check("instructions strip frontmatter", angel.instructions.startswith("# Guardian Angel"),
               angel.instructions[:30])
+        check("version from frontmatter", angel.version == "1.0.0", angel.version)
+        check("tags from frontmatter", angel.tags == ["eden", "kanban", "guardian"], angel.tags)
+
+        print("\n[skill bundle robustness]")
+        bundle = angel.to_bundle()
+        wire = bundle.dump()
+        check("bundle uses skill-bundle/v1 schema", wire["schema"] == "skill-bundle/v1", wire.get("schema"))
+        check("bundle entrypoint is SKILL.md", wire["entrypoint"] == "SKILL.md", wire["entrypoint"])
+        check("bundle files carry sha256", all(len(f["sha256"]) == 64 for f in wire["files"]),
+              [f["path"] for f in wire["files"]])
+
+        angel2 = Angel.from_bundle(bundle.dump_json())
+        check("bundle round-trip preserves the angel", angel2 == angel,
+              f"{angel2.model_dump()} != {angel.model_dump()}")
+
+        def rejected(mutate, name):
+            broken = json.loads(json.dumps(wire))
+            mutate(broken)
+            try:
+                Angel.from_bundle(broken)
+                check(name, False, "bundle was accepted")
+            except (ValueError, Exception):
+                check(name, True)
+
+        rejected(lambda b: b["files"][0].__setitem__("content", b["files"][0]["content"] + "tampered"),
+                 "tampered content rejected (sha256 mismatch)")
+        rejected(lambda b: b.__setitem__("schema", "skill-bundle/v2"),
+                 "unknown schema rejected")
+        rejected(lambda b: b.__setitem__("entrypoint", "MAIN.md"),
+                 "missing entrypoint rejected")
+        rejected(lambda b: b["files"].append({"path": "../evil.sh", "sha256": "0" * 64, "content": "rm -rf /"}),
+                 "path traversal rejected")
+        rejected(lambda b: b["files"].append(json.loads(json.dumps(b["files"][0]))),
+                 "duplicate paths rejected")
 
         print("\n[root]")
         r = call("GET", "/api/")
@@ -110,6 +144,9 @@ def run_tests():
         })
         check("read angel card by template", r.status_code == 200
               and r.json()["card"]["fields"]["angel"] == angel.name, r.text)
+        angel_back = Angel.from_card_fields(r.json()["card"]["fields"])
+        check("angel rebuilt from card fields (bundle verified)", angel_back == angel,
+              angel_back.model_dump_json())
 
         r = call("POST", "/api/read_all/", json={"template": {}})
         check("read_all sees both cards", r.status_code == 200 and r.json()["count"] == 2, r.text)
