@@ -2,6 +2,8 @@
 
 Eden represents the Garden of Eden where God places its Angels. The Angels are user persona's guardian Angels that operate on top of Hermes-Agent under the Linda coordination principle.
 
+> Full documentation: **[docs/eden.md](docs/eden.md)** — concept and Linda background, architecture, the space in detail (matching, visibility, leases, transactions, notifications), API reference, the agent layer (Angel, skill bundles, Skill identity, the Host), testing, and VPS deployment.
+
 ## Overview
 
 Eden is a FastAPI service that recreates the **JavaSpaces programming model** — a shared tuple space supporting write, read, take, notify, leases, and transactions — on top of **Hermes-Agent Kanban cards**. The Angels coordinate through the space instead of talking to each other directly (the Linda principle).
